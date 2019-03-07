@@ -53,3 +53,6 @@ dkms.conf
 
 #VS Code 
 \.vscode/
+
+#Do not ignore tests out
+!src/tests/output/*.out
