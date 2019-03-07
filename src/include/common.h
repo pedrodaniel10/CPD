@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RND0_1 ((double) rand() / ((long long)1<<31))
+#define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
 
@@ -27,7 +27,7 @@ typedef struct {
 void init_particles(long seed, long ncside, long long n_part, particle_t *par) {
     long long i;
 
-    srand(seed);
+    srandom(seed);
 
     for(i = 0; i < n_part; i++) {
         par[i].position.x = RND0_1;
