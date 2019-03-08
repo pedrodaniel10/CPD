@@ -9,6 +9,7 @@ TARGET_MPI = simpar-mpi
 
 CC = gcc 
 CFLAGS =-c -g3 -Wall -pedantic -Werror
+CFLAGSLINK =-lm
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 HEADERS = $(wildcard *.h)
 
@@ -23,19 +24,19 @@ serial.o:
 	$(CC) $(CFLAGS) $(SERIAL_DIR)/$(TARGET_SERIAL).c -o $(SERIAL_DIR)/$(TARGET_SERIAL).o 
 
 serial: serial.o
-	$(CC) $(SERIAL_DIR)/$(TARGET_SERIAL).o -o $(SERIAL_DIR)/$(TARGET_SERIAL)
+	$(CC) $(SERIAL_DIR)/$(TARGET_SERIAL).o $(CFLAGSLINK) -o $(SERIAL_DIR)/$(TARGET_SERIAL)
 
 omp.o: 
 	$(CC) $(CFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
 
 omp: omp.o
-	$(CC) $(OMP_DIR)/$(TARGET_OMP).o -o $(OMP_DIR)/$(TARGET_OMP)
+	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) -o $(OMP_DIR)/$(TARGET_OMP)
 
 mpi.o: 
 	$(CC) $(CFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
 
 mpi: mpi.o
-	$(CC) $(MPI_DIR)/$(TARGET_MPI).o -o $(MPI_DIR)/$(TARGET_MPI)
+	$(CC) $(MPI_DIR)/$(TARGET_MPI).o $(CFLAGSLINK) -o $(MPI_DIR)/$(TARGET_MPI)
 
 # To run a test have 2 parameters: test is the name of the test and program is the program to use to test
 # The program can be: serial, omp, mpi
