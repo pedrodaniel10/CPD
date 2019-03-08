@@ -1,7 +1,4 @@
 #include "../include/common.h"
-#include <math.h>
-
-#define DEBUG 0
 
 void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
     
@@ -9,13 +6,6 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
         particle_t *particle = &particles[i];
         cell_t *cell = &cells[particle->cell.x][particle->cell.y];
 
-        #if DEBUG
-        printf("Particle %d\n", i);
-        printf("Mass: %f\t", particles[i].mass);
-        printf("Coordinates: (%f, %f)\t", particles[i].position.x, particles[i].position.y);
-        printf("Index: (%d, %d)\n\n", particle->cell.x, particle->cell.y);
-        #endif
-        
         cell->mass_sum += particle->mass;
 
         cell->center_of_mass.x += particle->mass * particle->position.x;
@@ -31,17 +21,6 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
             }
         }
     }
-
-    #if DEBUG
-    printf("----------------------------------------------------\n\n");
-    for (int i = 0; i < grid_size; i++) {
-        for (int j = 0; j < grid_size; j++) {
-            printf("Cell [%d,%d]\n", i, j);
-            printf("Mass sum: %f\t", cells[i][j].mass_sum);
-            printf("Center of mass: (%f, %f)\n\n", cells[i][j].center_of_mass.x, cells[i][j].center_of_mass.y);
-        }
-    }
-    #endif
 }
 
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
@@ -88,6 +67,17 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         // Calculate new position
         particle->position.x += particle->velocity.x + acceleration.x * 1/2;
         particle->position.y += particle->velocity.y + acceleration.y * 1/2;
+
+        if (particle->position.x >= 1){
+            particle->position.x -= 1;
+        } else if (particle->position.x < 0) {
+            particle->position.x += 1;
+        }
+        if (particle->position.y >= 1){
+            particle->position.y -= 1;
+        } else if (particle->position.y < 0) {
+            particle->position.y += 1;
+        }
 
         // Calculate new cell position
         particle->cell.x = particle->position.x * grid_size;
@@ -143,6 +133,8 @@ int main(int argc, const char** argv) {
     }
     
     coordinate_t center_of_mass = calculate_overall_center_of_mass(particles, number_particles);
+    printf("%.2f %.2f\n", particles->position.x, particles->position.y);
+    printf("%.2f %.2f\n", center_of_mass.x, center_of_mass.y);
 
     // Free resources
     free(particles);
@@ -150,8 +142,6 @@ int main(int argc, const char** argv) {
         free(cells[i]);
     }
     free(cells);
-    
-    printf("%.2f %.2f\n", particles->position.x, particles->position.y);
-    printf("%.2f %.2f\n", center_of_mass.x, center_of_mass.y);
+
     return 0;
 }
