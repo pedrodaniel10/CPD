@@ -25,8 +25,10 @@ void compute_centers_of_mass(particle_t *particles, cell_t **cells, int n_part, 
     
     for (int i = 0; i < grid_size; i++) {
         for (int j = 0; j < grid_size; j++) {
-            cells[i][j].center_of_mass.x = cells[i][j].center_of_mass.x/cells[i][j].mass_sum;
-            cells[i][j].center_of_mass.y = cells[i][j].center_of_mass.y/cells[i][j].mass_sum;
+            if (cells[i][j].mass_sum != 0) {
+                cells[i][j].center_of_mass.x = cells[i][j].center_of_mass.x/cells[i][j].mass_sum;
+                cells[i][j].center_of_mass.y = cells[i][j].center_of_mass.y/cells[i][j].mass_sum;
+            }
         }
     }
 }
