@@ -56,3 +56,7 @@ dkms.conf
 
 #Do not ignore tests out
 !src/tests/output/*.out
+
+src/serial/peda-session-a\.out\.txt
+
+src/serial/\.gdb_history
