@@ -10,6 +10,7 @@ TARGET_MPI = simpar-mpi
 CC = gcc 
 CFLAGS =-c -g3 -Wall -pedantic -Werror
 CFLAGSLINK =-lm
+COMPFLAGS =-fopenmp
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 HEADERS = $(wildcard *.h)
 
@@ -27,10 +28,10 @@ serial: serial.o
 	$(CC) $(SERIAL_DIR)/$(TARGET_SERIAL).o $(CFLAGSLINK) -o $(SERIAL_DIR)/$(TARGET_SERIAL)
 
 omp.o: 
-	$(CC) $(CFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
+	$(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
 
 omp: omp.o
-	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) -o $(OMP_DIR)/$(TARGET_OMP)
+	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
 
 mpi.o: 
 	$(CC) $(CFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 

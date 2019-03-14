@@ -1,17 +1,21 @@
 #include "../include/common.h"
+#include <omp.h>
 
-void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
-    
+void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {  
+    #pragma omp parallel for
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         cell_t *cell = &cells[particle->cell.x][particle->cell.y];
-
+        
+        #pragma omp atomic
         cell->mass_sum += particle->mass;
-
+        #pragma omp atomic
         cell->center_of_mass.x += particle->mass * particle->position.x;
+        #pragma omp atomic
         cell->center_of_mass.y += particle->mass * particle->position.y;
     }
     
+    #pragma omp parallel for
     for (int i = 0; i < grid_size; i++) {
         for (int j = 0; j < grid_size; j++) {
             cell_t *cell = &cells[i][j];
@@ -45,14 +49,14 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
                 force_a_b.y = cell.center_of_mass.y - particle->position.y;
                 double distance = pow(pow(force_a_b.x, 2) + pow(force_a_b.y, 2), 1/2);
 
-                if (distance < EPSLON) {
+                if (distance >= EPSLON) {
                     double distance_cubed = pow(distance, 3);
                     force_a_b.x *= G * particle->mass * cell.mass_sum / distance_cubed;
                     force_a_b.y *= G * particle->mass * cell.mass_sum / distance_cubed;
 
                     force.x += force_a_b.x;
                     force.y += force_a_b.y;
-                }  
+                } 
             }
         }
 
