@@ -1,21 +1,33 @@
 #include "../include/common.h"
 #include <omp.h>
 
-void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {  
+void init_cells(long grid_size, cell_t** cells) {
     #pragma omp parallel for
+    for(int i = 0; i < grid_size; i++) {
+        for(int j = 0; j < grid_size; j++) {
+            int index_adjacent_cells = 0;
+            for (int x = -1; x <= 1; x++) {
+                for(int y = -1; y <= 1; y++) {
+                    cells[i][j].adjacent_cells[index_adjacent_cells].x = (i + (x + grid_size)) % grid_size;
+                    cells[i][j].adjacent_cells[index_adjacent_cells].y = (j + (y + grid_size)) % grid_size;
+                    index_adjacent_cells++;
+                }
+            }
+        }        
+    }
+}
+
+void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         cell_t *cell = &cells[particle->cell.x][particle->cell.y];
-        
-        #pragma omp atomic
+
         cell->mass_sum += particle->mass;
-        #pragma omp atomic
+
         cell->center_of_mass.x += particle->mass * particle->position.x;
-        #pragma omp atomic
         cell->center_of_mass.y += particle->mass * particle->position.y;
     }
     
-    #pragma omp parallel for
     for (int i = 0; i < grid_size; i++) {
         for (int j = 0; j < grid_size; j++) {
             cell_t *cell = &cells[i][j];
@@ -28,36 +40,34 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
 }
 
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
+    #pragma omp parallel for
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
-        coordinate_t force, acceleration, velocity; 
+        coordinate_t force, acceleration, velocity;
+        cell_t cell_particle = cells[particle->cell.x][particle->cell.y];
         force.x = force.y = 0;
         acceleration.x = acceleration.y = 0;
         velocity.x = velocity.y = 0;
 
         // Calculate force
-        for (int x = -1; x <= 1; x++) {
-            for(int y = -1; y <= 1; y++) {
-                int cell_x = (particle->cell.x + (x + grid_size)) % grid_size;
-                int cell_y = (particle->cell.y + (y + grid_size)) % grid_size;
+        for (int i = 0; i < ADJACENT_CELLS_NUMBER; i++) {
+            coordinate_cell_t adjacent_cell = cell_particle.adjacent_cells[i];
+            cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];
 
-                cell_t cell = cells[cell_x][cell_y];
+            coordinate_t force_a_b;
+            
+            force_a_b.x = cell.center_of_mass.x - particle->position.x;
+            force_a_b.y = cell.center_of_mass.y - particle->position.y;
+            double distance = pow(pow(force_a_b.x, 2) + pow(force_a_b.y, 2), 1/2);
 
-                coordinate_t force_a_b;
-                
-                force_a_b.x = cell.center_of_mass.x - particle->position.x;
-                force_a_b.y = cell.center_of_mass.y - particle->position.y;
-                double distance = pow(pow(force_a_b.x, 2) + pow(force_a_b.y, 2), 1/2);
+            if (distance < EPSLON) {
+                double distance_cubed = pow(distance, 3);
+                force_a_b.x *= G * particle->mass * cell.mass_sum / distance_cubed;
+                force_a_b.y *= G * particle->mass * cell.mass_sum / distance_cubed;
 
-                if (distance >= EPSLON) {
-                    double distance_cubed = pow(distance, 3);
-                    force_a_b.x *= G * particle->mass * cell.mass_sum / distance_cubed;
-                    force_a_b.y *= G * particle->mass * cell.mass_sum / distance_cubed;
-
-                    force.x += force_a_b.x;
-                    force.y += force_a_b.y;
-                } 
-            }
+                force.x += force_a_b.x;
+                force.y += force_a_b.y;
+            }  
         }
 
         // Calculate acceleration
@@ -124,6 +134,7 @@ int main(int argc, const char** argv) {
     }
     
     init_particles(atoi(argv[1]), grid_size, number_particles, particles);
+    init_cells(grid_size, cells);
 
     for (int n = 0; n < n_time_steps; n++) {
         calculate_centers_of_mass(particles, cells, grid_size, number_particles);
@@ -131,7 +142,8 @@ int main(int argc, const char** argv) {
 
         for (int i = 0; i < grid_size; i++) {
             for(int j = 0; j < grid_size; j++) {
-                cells[i][j] = (const cell_t) {0};
+                cells[i][j].center_of_mass = (const coordinate_t) {0};
+                cells[i][j].mass_sum = 0;
             }            
         }
     }

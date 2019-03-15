@@ -8,6 +8,7 @@
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
 #define EPSLON 0.01
+#define ADJACENT_CELLS_NUMBER 9
 
 typedef struct {
     double x;
@@ -29,6 +30,7 @@ typedef struct {
 typedef struct {
     double mass_sum;
     coordinate_t center_of_mass;
+    coordinate_cell_t adjacent_cells[ADJACENT_CELLS_NUMBER]; 
 } cell_t;
 
 void init_particles(long seed, long grid_size, long long number_particles, particle_t *particles) {
@@ -50,5 +52,4 @@ void init_particles(long seed, long grid_size, long long number_particles, parti
         particle->cell.y = particle->position.y * grid_size;
     }
 }
-
 #endif
