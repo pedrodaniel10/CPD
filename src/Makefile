@@ -11,8 +11,6 @@ CC = gcc
 CFLAGS =-c -g3 -Wall -pedantic -Werror
 CFLAGSLINK =-lm
 COMPFLAGS =-fopenmp
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
 
 TEST_DIR = $(ROOT_DIR)/tests
 Tests:=$(shell cd $(TEST_DIR); ls  | egrep '^test[0-9]+$$' | sort -n  )
@@ -63,6 +61,7 @@ testall:
 
 clean:
 	find . -type f -name '*.o' -delete
+	find . -type f -name '*.myout' -delete
 	find . -type f -name '$(TARGET_SERIAL)' -delete
 	find . -type f -name '$(TARGET_OMP)' -delete
 	find . -type f -name '*$(TARGET_MPI)' -delete

@@ -28,6 +28,7 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
         cell->center_of_mass.y += particle->mass * particle->position.y;
     }
     
+    #pragma omp parallel for if(grid_size >= 10)
     for (int i = 0; i < grid_size; i++) {
         for (int j = 0; j < grid_size; j++) {
             cell_t *cell = &cells[i][j];
@@ -100,19 +101,21 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
 }
 
 coordinate_t calculate_overall_center_of_mass(particle_t* particles, int number_particles) {
-    coordinate_t center_of_mass;
-    double total_mass = center_of_mass.x = center_of_mass.y = 0;
-    for (long long i = 0; i < number_particles; i++) {
+    double center_of_mass_x, center_of_mass_y;
+    double total_mass = center_of_mass_x = center_of_mass_y = 0;
+
+    #pragma omp parallel for reduction(+: total_mass, center_of_mass_x, center_of_mass_y)
+    for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         
         total_mass += particle->mass; 
-        center_of_mass.x += particle->mass * particle->position.x;
-        center_of_mass.y += particle->mass * particle->position.y;
+        center_of_mass_x += particle->mass * particle->position.x;
+        center_of_mass_y += particle->mass * particle->position.y;
     }
-    center_of_mass.x /= total_mass;
-    center_of_mass.y /= total_mass;
+    center_of_mass_x /= total_mass;
+    center_of_mass_y /= total_mass;
 
-    return center_of_mass;
+    return (coordinate_t) {center_of_mass_x, center_of_mass_y};
 }
 
 int main(int argc, const char** argv) {
