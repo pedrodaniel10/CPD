@@ -35,12 +35,17 @@
 *.i*86
 *.x86_64
 *.hex
+*simpar
+*simpar-omp
+*simpar-mpi
 
 # Debug files
 *.dSYM/
 *.su
 *.idb
 *.pdb
+*peda-session-a\.out\.txt
+*.gdb_history
 
 # Kernel Module Compile Results
 *.mod*
@@ -54,9 +59,10 @@ dkms.conf
 #VS Code 
 \.vscode/
 
-#Do not ignore tests out
+# ompP
+*opari*
+*mod.c
+*.txt
+
+# Do not ignore tests out
 !src/tests/output/*.out
-
-src/serial/peda-session-a\.out\.txt
-
-src/serial/\.gdb_history

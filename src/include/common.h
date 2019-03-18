@@ -33,8 +33,9 @@ typedef struct {
     coordinate_cell_t adjacent_cells[ADJACENT_CELLS_NUMBER]; 
 } cell_t;
 
-void init_particles(long seed, long grid_size, long long number_particles, particle_t *particles) {
+particle_t * init_particles(long seed, long grid_size, long long number_particles) {
     long long i;
+    particle_t *particles = (particle_t *) malloc (sizeof(particle_t) * number_particles);
 
     srandom(seed);
 
@@ -51,5 +52,6 @@ void init_particles(long seed, long grid_size, long long number_particles, parti
         particle->cell.x = particle->position.x * grid_size;
         particle->cell.y = particle->position.y * grid_size;
     }
+    return particles;
 }
 #endif

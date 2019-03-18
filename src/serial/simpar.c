@@ -1,18 +1,27 @@
 #include "../include/common.h"
 
-void init_cells(long grid_size, cell_t** cells) {
+cell_t** init_cells(int grid_size) {
+    cell_t **cells = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
+    
+    for (int i = 0; i < grid_size; i++) {
+        cells[i] = (cell_t *) calloc(grid_size, sizeof(cell_t));
+    }
+    
     for(int i = 0; i < grid_size; i++) {
         for(int j = 0; j < grid_size; j++) {
             int index_adjacent_cells = 0;
+            cell_t* cell = &cells[i][j];
+
             for (int x = -1; x <= 1; x++) {
                 for(int y = -1; y <= 1; y++) {
-                    cells[i][j].adjacent_cells[index_adjacent_cells].x = (i + (x + grid_size)) % grid_size;
-                    cells[i][j].adjacent_cells[index_adjacent_cells].y = (j + (y + grid_size)) % grid_size;
+                    cell->adjacent_cells[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
+                    cell->adjacent_cells[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
                     index_adjacent_cells++;
                 }
             }
         }        
     }
+    return cells;
 }
 
 void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
@@ -40,31 +49,27 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
-        coordinate_t force, acceleration, velocity;
+        coordinate_t force ={0}, acceleration = {0};
         cell_t cell_particle = cells[particle->cell.x][particle->cell.y];
-        force.x = force.y = 0;
-        acceleration.x = acceleration.y = 0;
-        velocity.x = velocity.y = 0;
-
+        
         // Calculate force
         for (int i = 0; i < ADJACENT_CELLS_NUMBER; i++) {
             coordinate_cell_t adjacent_cell = cell_particle.adjacent_cells[i];
-            cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];
-
-            coordinate_t force_a_b;
+            cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];  
+            coordinate_t force_a_b;  
             
             force_a_b.x = cell.center_of_mass.x - particle->position.x;
             force_a_b.y = cell.center_of_mass.y - particle->position.y;
-            double distance = pow(pow(force_a_b.x, 2) + pow(force_a_b.y, 2), 1/2);
+            double distance_squared = force_a_b.x * force_a_b.x + force_a_b.y * force_a_b.y;
 
-            if (distance < EPSLON) {
-                double distance_cubed = pow(distance, 3);
-                force_a_b.x *= G * particle->mass * cell.mass_sum / distance_cubed;
-                force_a_b.y *= G * particle->mass * cell.mass_sum / distance_cubed;
+            if (distance_squared < EPSLON * EPSLON) {
+                continue;
+            }
 
-                force.x += force_a_b.x;
-                force.y += force_a_b.y;
-            }  
+            double scalar_force = G * particle->mass * cell.mass_sum / (distance_squared * sqrt(distance_squared));
+
+            force.x += force_a_b.x * scalar_force;
+            force.y += force_a_b.y * scalar_force;
         }
 
         // Calculate acceleration
@@ -76,18 +81,18 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         particle->velocity.y += acceleration.y;
          
         // Calculate new position
-        particle->position.x += particle->velocity.x + acceleration.x * 1/2;
-        particle->position.y += particle->velocity.y + acceleration.y * 1/2;
+        particle->position.x += particle->velocity.x + acceleration.x * 0.5;
+        particle->position.y += particle->velocity.y + acceleration.y * 0.5;
 
         if (particle->position.x >= 1){
-            particle->position.x -= 1;
+            particle->position.x--;
         } else if (particle->position.x < 0) {
-            particle->position.x += 1;
+            particle->position.x++;
         }
         if (particle->position.y >= 1){
-            particle->position.y -= 1;
+            particle->position.y--;
         } else if (particle->position.y < 0) {
-            particle->position.y += 1;
+            particle->position.y++;
         }
 
         // Calculate new cell position
@@ -97,9 +102,9 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
 }
 
 coordinate_t calculate_overall_center_of_mass(particle_t* particles, int number_particles) {
-    coordinate_t center_of_mass;
-    double total_mass = center_of_mass.x = center_of_mass.y = 0;
-    for (long long i = 0; i < number_particles; i++) {
+    coordinate_t center_of_mass = {0};
+    double total_mass = 0;
+    for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         
         total_mass += particle->mass; 
@@ -122,16 +127,9 @@ int main(int argc, const char** argv) {
     int number_particles = atoi(argv[3]);
     int n_time_steps = atoi(argv[4]);
 
-    // Allocate resources
-    particle_t *particles = (particle_t *) malloc (sizeof(particle_t) * number_particles);
-    cell_t **cells = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
-    
-    for (int i = 0; i < grid_size; i++) {
-        cells[i] = (cell_t *) calloc(sizeof (cell_t), grid_size);
-    }
-    
-    init_particles(atoi(argv[1]), grid_size, number_particles, particles);
-    init_cells(grid_size, cells);
+    // Initialize
+    particle_t *particles = init_particles(atoi(argv[1]), grid_size, number_particles);
+    cell_t **cells = init_cells(grid_size);
 
     for (int n = 0; n < n_time_steps; n++) {
         calculate_centers_of_mass(particles, cells, grid_size, number_particles);
@@ -139,8 +137,9 @@ int main(int argc, const char** argv) {
 
         for (int i = 0; i < grid_size; i++) {
             for(int j = 0; j < grid_size; j++) {
-                cells[i][j].center_of_mass = (const coordinate_t) {0};
-                cells[i][j].mass_sum = 0;
+                cell_t* cell = &cells[i][j];
+                cell->center_of_mass = (const coordinate_t) {0};
+                cell->mass_sum = 0;
             }            
         }
     }
