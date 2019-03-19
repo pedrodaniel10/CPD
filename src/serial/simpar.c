@@ -81,19 +81,11 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         particle->velocity.y += acceleration.y;
          
         // Calculate new position
-        particle->position.x += particle->velocity.x + acceleration.x * 0.5;
-        particle->position.y += particle->velocity.y + acceleration.y * 0.5;
+        particle->position.x += particle->velocity.x + acceleration.x * 0.5 + 1;
+        particle->position.y += particle->velocity.y + acceleration.y * 0.5 + 1;
 
-        if (particle->position.x >= 1){
-            particle->position.x--;
-        } else if (particle->position.x < 0) {
-            particle->position.x++;
-        }
-        if (particle->position.y >= 1){
-            particle->position.y--;
-        } else if (particle->position.y < 0) {
-            particle->position.y++;
-        }
+        particle->position.x -= (int) particle->position.x;
+        particle->position.y -= (int) particle->position.y;
 
         // Calculate new cell position
         particle->cell.x = particle->position.x * grid_size;

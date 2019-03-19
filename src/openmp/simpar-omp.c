@@ -16,7 +16,7 @@ cell_t** init_cells(int grid_size) {
     for(int i = 0; i < num_max_threads; i++) {
         cells_threads[i] = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
         for(int j = 0; j < grid_size; j++) {
-            cells_threads[i][j] = (cell_t*) malloc(sizeof(cell_t) * grid_size);
+            cells_threads[i][j] = (cell_t*) calloc(grid_size, sizeof(cell_t));
         }
     }
     
@@ -42,11 +42,6 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
     {
         int num_threads = omp_get_num_threads();
         int thread_num = omp_get_thread_num();
-        for(int i = 0; i < grid_size; i++) {
-            for(int j = 0; j < grid_size; j++) {
-                cells_threads[thread_num][i][j] = (const cell_t) {0};
-            }
-        }
 
         #pragma omp for
         for (int i = 0; i < number_particles; i++) {
@@ -68,10 +63,11 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
                     cell->mass_sum += cell_thread->mass_sum;
                     cell->center_of_mass.x += cell_thread->center_of_mass.x;
                     cell->center_of_mass.x += cell_thread->center_of_mass.y;
+                    *cell_thread = (const cell_t) {0};
                 }
                 if (cell->mass_sum != 0) {
-                    cell->center_of_mass.x = cell->center_of_mass.x / cell->mass_sum;
-                    cell->center_of_mass.y = cell->center_of_mass.y / cell->mass_sum;
+                    cell->center_of_mass.x /= cell->mass_sum;
+                    cell->center_of_mass.y /= cell->mass_sum;
                 }
             }
         }
@@ -114,19 +110,11 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         particle->velocity.y += acceleration.y;
          
         // Calculate new position
-        particle->position.x += particle->velocity.x + acceleration.x * 0.5;
-        particle->position.y += particle->velocity.y + acceleration.y * 0.5;
+        particle->position.x += particle->velocity.x + acceleration.x * 0.5 + 1;
+        particle->position.y += particle->velocity.y + acceleration.y * 0.5 + 1;
 
-        if (particle->position.x >= 1){
-            particle->position.x--;
-        } else if (particle->position.x < 0) {
-            particle->position.x++;
-        }
-        if (particle->position.y >= 1){
-            particle->position.y--;
-        } else if (particle->position.y < 0) {
-            particle->position.y++;
-        }
+        particle->position.x -= (int) particle->position.x;
+        particle->position.y -= (int) particle->position.y;
 
         // Calculate new cell position
         particle->cell.x = particle->position.x * grid_size;
