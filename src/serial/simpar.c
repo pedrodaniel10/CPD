@@ -6,16 +6,20 @@ cell_t** init_cells(int grid_size) {
     for (int i = 0; i < grid_size; i++) {
         cells[i] = (cell_t *) calloc(grid_size, sizeof(cell_t));
     }
-    
+
+    adjacent_cells = (coordinate_cell_t ***) malloc(sizeof(coordinate_cell_t **) * grid_size);
+
     for(int i = 0; i < grid_size; i++) {
+        adjacent_cells[i] = (coordinate_cell_t **) malloc(sizeof(coordinate_cell_t *) * grid_size);
         for(int j = 0; j < grid_size; j++) {
+            adjacent_cells[i][j] = (coordinate_cell_t *) malloc(sizeof(coordinate_cell_t) * ADJACENT_CELLS_NUMBER);
             int index_adjacent_cells = 0;
-            cell_t* cell = &cells[i][j];
+            coordinate_cell_t* adjacent_cell = adjacent_cells[i][j];
 
             for (int x = -1; x <= 1; x++) {
                 for(int y = -1; y <= 1; y++) {
-                    cell->adjacent_cells[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
-                    cell->adjacent_cells[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
+                    adjacent_cell[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
+                    adjacent_cell[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
                     index_adjacent_cells++;
                 }
             }
@@ -39,8 +43,8 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
         for (int j = 0; j < grid_size; j++) {
             cell_t *cell = &cells[i][j];
             if (cell->mass_sum != 0) {
-                cell->center_of_mass.x = cell->center_of_mass.x / cell->mass_sum;
-                cell->center_of_mass.y = cell->center_of_mass.y / cell->mass_sum;
+                cell->center_of_mass.x /= cell->mass_sum;
+                cell->center_of_mass.y /= cell->mass_sum;
             }
         }
     }
@@ -50,11 +54,11 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         coordinate_t force ={0}, acceleration = {0};
-        cell_t cell_particle = cells[particle->cell.x][particle->cell.y];
+        coordinate_cell_t* particle_adjacent_cell = adjacent_cells[particle->cell.x][particle->cell.y];
         
         // Calculate force
         for (int i = 0; i < ADJACENT_CELLS_NUMBER; i++) {
-            coordinate_cell_t adjacent_cell = cell_particle.adjacent_cells[i];
+            coordinate_cell_t adjacent_cell = particle_adjacent_cell[i];
             cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];  
             coordinate_t force_a_b;  
             
@@ -144,8 +148,13 @@ int main(int argc, const char** argv) {
     free(particles);
     for(int i = 0; i < grid_size; i++) {
         free(cells[i]);
+        for(int j = 0; j < grid_size; j++) {
+            free(adjacent_cells[i][j]);
+        }
+        free(adjacent_cells[i]);
     }
     free(cells);
+    free(adjacent_cells);
 
     return 0;
 }

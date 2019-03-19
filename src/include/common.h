@@ -30,8 +30,9 @@ typedef struct {
 typedef struct {
     double mass_sum;
     coordinate_t center_of_mass;
-    coordinate_cell_t adjacent_cells[ADJACENT_CELLS_NUMBER]; 
 } cell_t;
+
+static coordinate_cell_t*** adjacent_cells;
 
 particle_t * init_particles(long seed, long grid_size, long long number_particles) {
     long long i;

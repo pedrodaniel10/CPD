@@ -7,7 +7,8 @@ TARGET_SERIAL = simpar
 TARGET_OMP = simpar-omp
 TARGET_MPI = simpar-mpi
 
-CC = gcc 
+CC =gcc 
+COMPP =kinst-ompp 
 CFLAGS =-c -g3 -Wall -pedantic -Werror
 CFLAGSLINK =-lm
 COMPFLAGS =-fopenmp
@@ -28,14 +29,14 @@ serial: serial.o
 
 omp.o: 
 ifeq ($(ompp), true)
-	kinst-ompp $(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
+	$(COMPP) $(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
 else
 	$(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o
 endif
 
 omp: omp.o
 ifeq ($(ompp), true)
-	kinst-ompp $(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
+	$(COMPP) $(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
 else
 	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
 endif

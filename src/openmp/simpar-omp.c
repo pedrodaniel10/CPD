@@ -20,15 +20,19 @@ cell_t** init_cells(int grid_size) {
         }
     }
     
+    adjacent_cells = (coordinate_cell_t ***) malloc(sizeof(coordinate_cell_t **) * grid_size);
+
     for(int i = 0; i < grid_size; i++) {
+        adjacent_cells[i] = (coordinate_cell_t **) malloc(sizeof(coordinate_cell_t *) * grid_size);
         for(int j = 0; j < grid_size; j++) {
+            adjacent_cells[i][j] = (coordinate_cell_t *) malloc(sizeof(coordinate_cell_t) * ADJACENT_CELLS_NUMBER);
             int index_adjacent_cells = 0;
-            cell_t* cell = &cells[i][j];
+            coordinate_cell_t* adjacent_cell = adjacent_cells[i][j];
 
             for (int x = -1; x <= 1; x++) {
                 for(int y = -1; y <= 1; y++) {
-                    cell->adjacent_cells[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
-                    cell->adjacent_cells[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
+                    adjacent_cell[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
+                    adjacent_cell[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
                     index_adjacent_cells++;
                 }
             }
@@ -59,11 +63,11 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
             for(int j = 0; j < grid_size; j++) {
                 cell_t *cell = &cells[i][j];
                 for (int k = 0; k < num_threads; k++) {
-                    cell_t *cell_thread = &cells_threads[k][i][j];
-                    cell->mass_sum += cell_thread->mass_sum;
-                    cell->center_of_mass.x += cell_thread->center_of_mass.x;
-                    cell->center_of_mass.x += cell_thread->center_of_mass.y;
-                    *cell_thread = (const cell_t) {0};
+                    cell_t *thread_cell= &cells_threads[k][i][j];
+                    cell->mass_sum += thread_cell->mass_sum;
+                    cell->center_of_mass.x += thread_cell->center_of_mass.x;
+                    cell->center_of_mass.x += thread_cell->center_of_mass.y;
+                    *thread_cell= (const cell_t) {0};
                 }
                 if (cell->mass_sum != 0) {
                     cell->center_of_mass.x /= cell->mass_sum;
@@ -79,11 +83,11 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         coordinate_t force ={0}, acceleration = {0};
-        cell_t cell_particle = cells[particle->cell.x][particle->cell.y];
+        coordinate_cell_t* particle_adjacent_cell = adjacent_cells[particle->cell.x][particle->cell.y];
         
         // Calculate force
         for (int i = 0; i < ADJACENT_CELLS_NUMBER; i++) {
-            coordinate_cell_t adjacent_cell = cell_particle.adjacent_cells[i];
+            coordinate_cell_t adjacent_cell = particle_adjacent_cell[i];
             cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];  
             coordinate_t force_a_b;  
             
@@ -187,8 +191,13 @@ int main(int argc, const char** argv) {
     #pragma omp parallel for
     for(int i = 0; i < grid_size; i++) {
         free(cells[i]);
+        for(int j = 0; j < grid_size; j++) {
+            free(adjacent_cells[i][j]);
+        }
+        free(adjacent_cells[i]);
     }
     free(cells);
+    free(adjacent_cells);
 
     #pragma omp parallel for
     for(int i = 0; i < num_max_threads; i++) {
