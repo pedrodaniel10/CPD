@@ -1,4 +1,8 @@
 #include "../include/common.h"
+#include <omp.h>
+
+cell_t*** cells_threads;
+int num_max_threads;
 
 cell_t** init_cells(int grid_size) {
     cell_t **cells = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
@@ -7,6 +11,15 @@ cell_t** init_cells(int grid_size) {
         cells[i] = (cell_t *) calloc(grid_size, sizeof(cell_t));
     }
 
+    cells_threads = (cell_t ***) malloc(sizeof(cell_t **) * num_max_threads);
+
+    for(int i = 0; i < num_max_threads; i++) {
+        cells_threads[i] = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
+        for(int j = 0; j < grid_size; j++) {
+            cells_threads[i][j] = (cell_t*) calloc(grid_size, sizeof(cell_t));
+        }
+    }
+    
     adjacent_cells = (coordinate_cell_t ***) malloc(sizeof(coordinate_cell_t **) * grid_size);
 
     for(int i = 0; i < grid_size; i++) {
@@ -29,28 +42,44 @@ cell_t** init_cells(int grid_size) {
 }
 
 void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
-    for (int i = 0; i < number_particles; i++) {
-        particle_t *particle = &particles[i];
-        cell_t *cell = &cells[particle->cell.x][particle->cell.y];
+    #pragma omp parallel
+    {
+        int num_threads = omp_get_num_threads();
+        int thread_num = omp_get_thread_num();
 
-        cell->mass_sum += particle->mass;
+        #pragma omp for
+        for (int i = 0; i < number_particles; i++) {
+            particle_t *particle = &particles[i];
+            cell_t *cell = &cells_threads[thread_num][particle->cell.x][particle->cell.y];
 
-        cell->center_of_mass.x += particle->mass * particle->position.x;
-        cell->center_of_mass.y += particle->mass * particle->position.y;
-    }
-    
-    for (int i = 0; i < grid_size; i++) {
-        for (int j = 0; j < grid_size; j++) {
-            cell_t *cell = &cells[i][j];
-            if (cell->mass_sum != 0) {
-                cell->center_of_mass.x /= cell->mass_sum;
-                cell->center_of_mass.y /= cell->mass_sum;
+            cell->mass_sum += particle->mass;
+
+            cell->center_of_mass.x += particle->mass * particle->position.x;
+            cell->center_of_mass.y += particle->mass * particle->position.y;
+        }
+
+        #pragma omp for
+        for(int i = 0; i < grid_size; i++) {
+            for(int j = 0; j < grid_size; j++) {
+                cell_t *cell = &cells[i][j];
+                for (int k = 0; k < num_threads; k++) {
+                    cell_t *thread_cell= &cells_threads[k][i][j];
+                    cell->mass_sum += thread_cell->mass_sum;
+                    cell->center_of_mass.x += thread_cell->center_of_mass.x;
+                    cell->center_of_mass.x += thread_cell->center_of_mass.y;
+                    *thread_cell= (const cell_t) {0};
+                }
+                if (cell->mass_sum != 0) {
+                    cell->center_of_mass.x /= cell->mass_sum;
+                    cell->center_of_mass.y /= cell->mass_sum;
+                }
             }
         }
     }
 }
 
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
+    #pragma omp parallel for
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         coordinate_t force ={0}, acceleration = {0};
@@ -98,19 +127,20 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
 }
 
 coordinate_t calculate_overall_center_of_mass(particle_t* particles, int number_particles) {
-    coordinate_t center_of_mass = {0};
+    double center_of_mass_x = 0, center_of_mass_y = 0;
     double total_mass = 0;
+    #pragma omp parallel for reduction(+:total_mass, center_of_mass_x, center_of_mass_y)
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         
         total_mass += particle->mass; 
-        center_of_mass.x += particle->mass * particle->position.x;
-        center_of_mass.y += particle->mass * particle->position.y;
+        center_of_mass_x += particle->mass * particle->position.x;
+        center_of_mass_y += particle->mass * particle->position.y;
     }
-    center_of_mass.x /= total_mass;
-    center_of_mass.y /= total_mass;
+    center_of_mass_x /= total_mass;
+    center_of_mass_y /= total_mass;
 
-    return center_of_mass;
+    return (coordinate_t) {center_of_mass_x, center_of_mass_y};
 }
 
 int main(int argc, const char** argv) {
@@ -122,15 +152,27 @@ int main(int argc, const char** argv) {
     int grid_size= atoi(argv[2]);
     int number_particles = atoi(argv[3]);
     int n_time_steps = atoi(argv[4]);
-
+    num_max_threads = omp_get_max_threads();
+    particle_t *particles;
+    cell_t **cells;
     // Initialize
-    particle_t *particles = init_particles(atoi(argv[1]), grid_size, number_particles);
-    cell_t **cells = init_cells(grid_size);
-
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            particles = init_particles(atoi(argv[1]), grid_size, number_particles);
+        }
+        #pragma omp section
+        {
+            cells = init_cells(grid_size);
+        }        
+    }
+    
     for (int n = 0; n < n_time_steps; n++) {
         calculate_centers_of_mass(particles, cells, grid_size, number_particles);
         calculate_new_iteration(particles, cells, grid_size, number_particles);
 
+        #pragma omp parallel for if(grid_size >= 10)
         for (int i = 0; i < grid_size; i++) {
             for(int j = 0; j < grid_size; j++) {
                 cell_t* cell = &cells[i][j];
@@ -146,6 +188,7 @@ int main(int argc, const char** argv) {
 
     // Free resources
     free(particles);
+    #pragma omp parallel for
     for(int i = 0; i < grid_size; i++) {
         free(cells[i]);
         for(int j = 0; j < grid_size; j++) {
@@ -156,5 +199,13 @@ int main(int argc, const char** argv) {
     free(cells);
     free(adjacent_cells);
 
+    #pragma omp parallel for
+    for(int i = 0; i < num_max_threads; i++) {
+        for(int j = 0; j < grid_size; j++) {
+            free(cells_threads[i][j]);
+        }        
+        free(cells_threads[i]);
+    }
+    free(cells_threads);
     return 0;
 }

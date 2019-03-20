@@ -7,16 +7,17 @@ TARGET_SERIAL = simpar
 TARGET_OMP = simpar-omp
 TARGET_MPI = simpar-mpi
 
-CC = gcc 
+CC =gcc 
+COMPP =kinst-ompp 
 CFLAGS =-c -g3 -Wall -pedantic -Werror
 CFLAGSLINK =-lm
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
+COMPFLAGS =-fopenmp
 
 TEST_DIR = $(ROOT_DIR)/tests
 Tests:=$(shell cd $(TEST_DIR); ls  | egrep '^test[0-9]+$$' | sort -n  )
 program = serial
 test = test01
+ompp = false
 
 all: serial omp mpi
 
@@ -27,10 +28,18 @@ serial: serial.o
 	$(CC) $(SERIAL_DIR)/$(TARGET_SERIAL).o $(CFLAGSLINK) -o $(SERIAL_DIR)/$(TARGET_SERIAL)
 
 omp.o: 
-	$(CC) $(CFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
+ifeq ($(ompp), true)
+	$(COMPP) $(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o 
+else
+	$(CC) $(CFLAGS) $(COMPFLAGS) $(OMP_DIR)/$(TARGET_OMP).c -o $(OMP_DIR)/$(TARGET_OMP).o
+endif
 
 omp: omp.o
-	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) -o $(OMP_DIR)/$(TARGET_OMP)
+ifeq ($(ompp), true)
+	$(COMPP) $(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
+else
+	$(CC) $(OMP_DIR)/$(TARGET_OMP).o $(CFLAGSLINK) $(COMPFLAGS) -o $(OMP_DIR)/$(TARGET_OMP)
+endif
 
 mpi.o: 
 	$(CC) $(CFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
@@ -60,8 +69,17 @@ endif
 testall: 
 	$(foreach x, $(Tests), $(MAKE) test program=$(program) test=$x;)
 
+rompp:
+	find . -type f -name 'opari.rc' -delete
+	$(MAKE) test
+
 clean:
 	find . -type f -name '*.o' -delete
+	find . -type f -name '*.myout' -delete
 	find . -type f -name '$(TARGET_SERIAL)' -delete
 	find . -type f -name '$(TARGET_OMP)' -delete
-	find . -type f -name '*$(TARGET_MPI)' -delete
+	find . -type f -name '$(TARGET_OMP).c.*' -delete
+	find . -type f -name '$(TARGET_OMP).mod.c' -delete
+	find . -type f -name 'opari*' -delete
+	find . -type f -name '*.txt' -delete
+	find . -type f -name '$(TARGET_MPI)' -delete
