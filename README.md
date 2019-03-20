@@ -42,7 +42,7 @@ Don't forget to change the file **Makefile.defs**. The makefile expects the exis
 
 The Makefile integrates the use of the profiler. So, in order to get this feature, you need first to compile the code with the followiing command:
 ```
-    make [program=implementation] ompp=true
+    make [implementation] ompp=true
 ```
 Then, you just need to run the test you want to profile with the command:
 ```
