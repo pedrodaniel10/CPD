@@ -1,18 +1,25 @@
 #include "../include/common.h"
 
 cell_t** init_cells(int grid_size) {
-    cell_t **cells = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
-    
+    // Allocate Cells
+    cell_t **cells_matrix = (cell_t **) malloc(sizeof(cell_t *) * grid_size);
+    cell_t *cells_chunk = (cell_t *) calloc(grid_size * grid_size, sizeof(cell_t));
+
     for (int i = 0; i < grid_size; i++) {
-        cells[i] = (cell_t *) calloc(grid_size, sizeof(cell_t));
+        cells_matrix[i] = cells_chunk + (i * grid_size);
     }
 
+    // Allocate Adjacent Cells Memory
+    coordinate_cell_t *adjacent_cells_chunk = (coordinate_cell_t *) malloc(sizeof(coordinate_cell_t) * grid_size * grid_size * ADJACENT_CELLS_NUMBER);
+    coordinate_cell_t **adjacent_cells_rows = (coordinate_cell_t **) malloc(sizeof(coordinate_cell_t *) * grid_size * grid_size);
     adjacent_cells = (coordinate_cell_t ***) malloc(sizeof(coordinate_cell_t **) * grid_size);
 
+    // Initialize Adjacent Cells Memory
     for(int i = 0; i < grid_size; i++) {
-        adjacent_cells[i] = (coordinate_cell_t **) malloc(sizeof(coordinate_cell_t *) * grid_size);
+        adjacent_cells[i] = &adjacent_cells_rows[i * grid_size];
+
         for(int j = 0; j < grid_size; j++) {
-            adjacent_cells[i][j] = (coordinate_cell_t *) malloc(sizeof(coordinate_cell_t) * ADJACENT_CELLS_NUMBER);
+            adjacent_cells[i][j] = &adjacent_cells_chunk[(i * grid_size + j) * ADJACENT_CELLS_NUMBER];
             int index_adjacent_cells = 0;
             coordinate_cell_t* adjacent_cell = adjacent_cells[i][j];
 
@@ -25,7 +32,7 @@ cell_t** init_cells(int grid_size) {
             }
         }        
     }
-    return cells;
+    return cells_matrix;
 }
 
 void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
@@ -53,7 +60,7 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
-        coordinate_t force ={0}, acceleration = {0};
+        coordinate_t force = {0}, acceleration = {0};
         coordinate_cell_t* particle_adjacent_cell = adjacent_cells[particle->cell.x][particle->cell.y];
         
         // Calculate force
@@ -80,10 +87,6 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         acceleration.x = force.x / particle->mass;
         acceleration.y = force.y / particle->mass;
 
-        // Calculate new velocity
-        particle->velocity.x += acceleration.x;
-        particle->velocity.y += acceleration.y;
-         
         // Calculate new position
         particle->position.x += particle->velocity.x + acceleration.x * 0.5 + 1;
         particle->position.y += particle->velocity.y + acceleration.y * 0.5 + 1;
@@ -91,6 +94,10 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
         particle->position.x -= (int) particle->position.x;
         particle->position.y -= (int) particle->position.y;
 
+        // Calculate new velocity
+        particle->velocity.x += acceleration.x;
+        particle->velocity.y += acceleration.y;
+         
         // Calculate new cell position
         particle->cell.x = particle->position.x * grid_size;
         particle->cell.y = particle->position.y * grid_size;
@@ -131,13 +138,7 @@ int main(int argc, const char** argv) {
         calculate_centers_of_mass(particles, cells, grid_size, number_particles);
         calculate_new_iteration(particles, cells, grid_size, number_particles);
 
-        for (int i = 0; i < grid_size; i++) {
-            for(int j = 0; j < grid_size; j++) {
-                cell_t* cell = &cells[i][j];
-                cell->center_of_mass = (const coordinate_t) {0};
-                cell->mass_sum = 0;
-            }            
-        }
+        memset(cells[0], 0, sizeof(cell_t) * grid_size * grid_size);
     }
     
     coordinate_t center_of_mass = calculate_overall_center_of_mass(particles, number_particles);
@@ -146,15 +147,10 @@ int main(int argc, const char** argv) {
 
     // Free resources
     free(particles);
-    for(int i = 0; i < grid_size; i++) {
-        free(cells[i]);
-        for(int j = 0; j < grid_size; j++) {
-            free(adjacent_cells[i][j]);
-        }
-        free(adjacent_cells[i]);
-    }
+    free(cells[0]);
     free(cells);
+    free(adjacent_cells[0][0]);
+    free(adjacent_cells[0]);
     free(adjacent_cells);
-
     return 0;
 }
