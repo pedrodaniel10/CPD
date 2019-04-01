@@ -33,7 +33,7 @@ typedef struct {
     coordinate_t center_of_mass;
 } cell_t;
 
-static coordinate_cell_t*** adjacent_cells;
+static cell_t**** adjacent_cells;
 
 particle_t * init_particles(long seed, long grid_size, long long number_particles) {
     long long i;

@@ -15,12 +15,12 @@ cell_t** init_cells(int grid_size) {
         for(int j = 0; j < grid_size; j++) {
             cells_threads[i][j] = &cells_chunk[(i * grid_size * grid_size) + (j * grid_size)];
         }
-    }
-    
-   // Allocate Adjacent Cells Memory
-    coordinate_cell_t *adjacent_cells_chunk = (coordinate_cell_t *) malloc(sizeof(coordinate_cell_t) * grid_size * grid_size * ADJACENT_CELLS_NUMBER);
-    coordinate_cell_t **adjacent_cells_rows = (coordinate_cell_t **) malloc(sizeof(coordinate_cell_t *) * grid_size * grid_size);
-    adjacent_cells = (coordinate_cell_t ***) malloc(sizeof(coordinate_cell_t **) * grid_size);
+    }    
+
+    // Allocate Adjacent Cells Memory
+    cell_t **adjacent_cells_chunk = (cell_t **) malloc(sizeof(cell_t*) * grid_size * grid_size * ADJACENT_CELLS_NUMBER);
+    cell_t ***adjacent_cells_rows = (cell_t ***) malloc(sizeof(cell_t **) * grid_size * grid_size);
+    adjacent_cells = (cell_t ****) malloc(sizeof(cell_t ***) * grid_size);
 
     // Initialize Adjacent Cells Memory
     for(int i = 0; i < grid_size; i++) {
@@ -29,12 +29,11 @@ cell_t** init_cells(int grid_size) {
         for(int j = 0; j < grid_size; j++) {
             adjacent_cells[i][j] = &adjacent_cells_chunk[(i * grid_size + j) * ADJACENT_CELLS_NUMBER];
             int index_adjacent_cells = 0;
-            coordinate_cell_t* adjacent_cell = adjacent_cells[i][j];
+            cell_t** adjacent_cell = adjacent_cells[i][j];
 
             for (int x = -1; x <= 1; x++) {
                 for(int y = -1; y <= 1; y++) {
-                    adjacent_cell[index_adjacent_cells].x = (i + x + grid_size) % grid_size;
-                    adjacent_cell[index_adjacent_cells].y = (j + y + grid_size) % grid_size;
+                    adjacent_cell[index_adjacent_cells] = &cells_threads[0][(i + x + grid_size) % grid_size][(j + y + grid_size) % grid_size];
                     index_adjacent_cells++;
                 }
             }
@@ -84,23 +83,22 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
     for (int i = 0; i < number_particles; i++) {
         particle_t *particle = &particles[i];
         coordinate_t force = {0}, acceleration = {0};
-        coordinate_cell_t* particle_adjacent_cell = adjacent_cells[particle->cell.x][particle->cell.y];
+        cell_t** particle_adjacent_cell = adjacent_cells[particle->cell.x][particle->cell.y];
         
         // Calculate force
         for (int i = 0; i < ADJACENT_CELLS_NUMBER; i++) {
-            coordinate_cell_t adjacent_cell = particle_adjacent_cell[i];
-            cell_t cell = cells[adjacent_cell.x][adjacent_cell.y];  
+            cell_t* adjacent_cell = particle_adjacent_cell[i];
             coordinate_t force_a_b;  
             
-            force_a_b.x = cell.center_of_mass.x - particle->position.x;
-            force_a_b.y = cell.center_of_mass.y - particle->position.y;
+            force_a_b.x = adjacent_cell->center_of_mass.x - particle->position.x;
+            force_a_b.y = adjacent_cell->center_of_mass.y - particle->position.y;
             double distance_squared = force_a_b.x * force_a_b.x + force_a_b.y * force_a_b.y;
 
             if (distance_squared < EPSLON * EPSLON) {
                 continue;
             }
 
-            double scalar_force = G * particle->mass * cell.mass_sum / (distance_squared * sqrt(distance_squared));
+            double scalar_force = G * particle->mass * adjacent_cell->mass_sum / (distance_squared * sqrt(distance_squared));
 
             force.x += force_a_b.x * scalar_force;
             force.y += force_a_b.y * scalar_force;
@@ -159,7 +157,7 @@ int main(int argc, const char** argv) {
     // Initialize
     particles = init_particles(atoi(argv[1]), grid_size, number_particles);
     cells = init_cells(grid_size);
-    
+       
     for (int n = 0; n < n_time_steps; n++) {
         calculate_centers_of_mass(particles, cells, grid_size, number_particles);
         calculate_new_iteration(particles, cells, grid_size, number_particles);
@@ -179,6 +177,6 @@ int main(int argc, const char** argv) {
     free(adjacent_cells[0][0]);
     free(adjacent_cells[0]);
     free(adjacent_cells);
-
+    
     return 0;
 }
