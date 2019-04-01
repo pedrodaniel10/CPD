@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #define RND0_1 ((double) random() / ((long long)1<<31))
 #define G 6.67408e-11
@@ -32,7 +33,7 @@ typedef struct {
     coordinate_t center_of_mass;
 } cell_t;
 
-static coordinate_cell_t*** adjacent_cells;
+static cell_t**** adjacent_cells;
 
 particle_t * init_particles(long seed, long grid_size, long long number_particles) {
     long long i;
