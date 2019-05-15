@@ -1,5 +1,5 @@
 #include <omp.h>
-#include "../include/common.h"
+#include "../include/particles.h"
 
 cell_t ***cells_threads;
 int num_max_threads;
