@@ -53,6 +53,8 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
 				cell->center_of_mass.x /= cell->mass_sum;
 				cell->center_of_mass.y /= cell->mass_sum;
 			}
+			printf("[%d,%d] center_of_mass =(%f, %f)\n", i, j, cell->center_of_mass.x, cell->center_of_mass.y);
+			fflush(stdout);
 		}
 	}
 }

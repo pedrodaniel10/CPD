@@ -3,11 +3,22 @@
 
 #include "structures.h"
 
+enum { DIAGONAL_UP_LEFT, UP, DIAGONAL_UP_RIGHT, LEFT, RIGHT, DIAGONAL_DOWN_LEFT, DOWN, DIAGONAL_DOWN_RIGHT };
+
 typedef struct {
 	int length;
 	int size;
 	particle_t* particles;
 } array_list_t;
+
+typedef struct {
+	int rank;
+	array_list_t* particles_buffer_send;
+	array_list_t* particles_buffer_recv;
+	int length_send_buffer;
+	cell_t* cells_buffer_send;
+	cell_t* cells_buffer_recv;
+} node_t;
 
 array_list_t* create_array_list(int initial_size) {
 	if (initial_size <= 0) {
