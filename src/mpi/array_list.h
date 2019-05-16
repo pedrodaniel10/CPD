@@ -18,6 +18,9 @@ typedef struct {
 	int length_send_buffer;
 	cell_t* cells_buffer_send;
 	cell_t* cells_buffer_recv;
+	int sent;
+	int received;
+	int index;
 } node_t;
 
 array_list_t* create_array_list(int initial_size) {

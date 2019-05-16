@@ -7,6 +7,10 @@
 #define SIZEOF_PARTICLE(n) (n * PARTICLE_SIZE)
 #define GET_NUMBER_PARTICLE(n) (n / PARTICLE_SIZE)
 
+#define CELL_SIZE 3
+#define SIZEOF_CELL(n) (n * CELL_SIZE)
+#define GET_NUMBER_CELL(n) (n / CELL_SIZE)
+
 // Where n is the number of elements, p the number of processes and id is the rank of the process.
 #define BLOCK_LOW(id, p, n) ((id) * (n) / (p))
 #define BLOCK_HIGH(id, p, n) (BLOCK_LOW((id) + 1, p, n) - 1)
