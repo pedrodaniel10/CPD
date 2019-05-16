@@ -14,13 +14,14 @@ typedef struct {
 typedef struct {
 	int rank;
 	array_list_t* particles_buffer_send;
-	array_list_t* particles_buffer_recv;
+	particle_t particles_buffer_recv;
 	int length_send_buffer;
 	cell_t* cells_buffer_send;
 	cell_t* cells_buffer_recv;
+	int index;
 	int sent;
 	int received;
-	int index;
+	int copied;
 } node_t;
 
 array_list_t* create_array_list(int initial_size) {
@@ -37,7 +38,7 @@ array_list_t* create_array_list(int initial_size) {
 }
 
 void append(array_list_t* list, particle_t particle) {
-	if (list->size == list->length) {
+	if (list->size <= list->length + 1) {
 		list->size *= 2;
 		list->particles = (particle_t*)realloc(list->particles, sizeof(particle_t) * list->size);
 	}
@@ -46,7 +47,7 @@ void append(array_list_t* list, particle_t particle) {
 }
 
 particle_t* allocate_array(array_list_t* list, int size) {
-	while (list->size - list->length < size) {
+	while (list->length + size > list->size) {
 		list->size *= 2;
 		list->particles = (particle_t*)realloc(list->particles, sizeof(particle_t) * list->size);
 	}
@@ -61,4 +62,26 @@ particle_t* list_get(array_list_t* list, int index) {
 	}
 	return &list->particles[index];
 }
+
+void list_update(array_list_t* list, int index, particle_t particle) {
+	particle_t* particle_array = list_get(list, index);
+	if (particle_array == NULL) {
+		return;
+	}
+	*particle_array = particle;
+}
+
+particle_t list_remove(array_list_t* list, int index) {
+	particle_t particle_return = {0};
+	particle_t* particle = list_get(list, index);
+	if (particle != NULL) {
+		particle_return = *particle;
+		*particle = *list_get(list, list->length - 1);
+		list->length--;
+	}
+	return particle_return;
+}
+
+void list_free(array_list_t* list) { free(list); }
+
 #endif

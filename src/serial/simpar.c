@@ -53,8 +53,6 @@ void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_s
 				cell->center_of_mass.x /= cell->mass_sum;
 				cell->center_of_mass.y /= cell->mass_sum;
 			}
-			printf("[%d,%d] center_of_mass =(%f, %f)\n", i, j, cell->center_of_mass.x, cell->center_of_mass.y);
-			fflush(stdout);
 		}
 	}
 }
@@ -136,12 +134,25 @@ int main(int argc, const char **argv) {
 	particle_t *particles = init_particles(atoi(argv[1]), grid_size, number_particles);
 	cell_t **cells = init_cells(grid_size);
 
+	// for (int i = 0; i < number_particles; i++) {
+	// 	particle_t *particle = &particles[i];
+
+	// 	printf("Iteration = -1 / Particle #%d: velocity = (%f,%f), position = (%f,%f)\n", i, particle->velocity.x,
+	// 	       particle->velocity.y, particle->position.x, particle->position.y);
+	// }
+
 	for (int n = 0; n < n_time_steps; n++) {
 		calculate_centers_of_mass(particles, cells, grid_size, number_particles);
 		calculate_new_iteration(particles, cells, grid_size, number_particles);
 
 		memset(cells[0], 0, sizeof(cell_t) * grid_size * grid_size);
 	}
+	// for (int i = 0; i < number_particles; i++) {
+	// 	particle_t *particle = &particles[i];
+
+	// 	printf("Particle #%d: velocity = (%f,%f), position = (%f,%f)\n", i, particle->velocity.x, particle->velocity.y,
+	// 	       particle->position.x, particle->position.y);
+	// }
 
 	coordinate_t center_of_mass = calculate_overall_center_of_mass(particles, number_particles);
 	printf("%.2f %.2f\n", particles->position.x, particles->position.y);

@@ -43,10 +43,10 @@ else
 endif
 
 mpi.o: 
-	$(MPICC) $(CFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
+	$(MPICC) $(CFLAGS) $(COMPFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
 
 mpi: mpi.o
-	$(MPICC) $(MPI_DIR)/$(TARGET_MPI).o $(CFLAGSLINK) -o $(MPI_DIR)/$(TARGET_MPI)
+	$(MPICC) $(MPI_DIR)/$(TARGET_MPI).o $(CFLAGSLINK) $(COMPFLAGS) -o $(MPI_DIR)/$(TARGET_MPI)
 
 # To run a test have 2 parameters: test is the name of the test and program is the program to use to test
 # The program can be: serial, omp, mpi
