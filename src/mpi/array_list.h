@@ -13,15 +13,13 @@ typedef struct {
 
 typedef struct {
 	int rank;
-	array_list_t* particles_buffer_send;
-	particle_t particles_buffer_recv;
 	int length_send_buffer;
+	array_list_t* particles_buffer_send;
 	cell_t* cells_buffer_send;
 	cell_t* cells_buffer_recv;
 	int index;
 	int sent;
 	int received;
-	int copied;
 } node_t;
 
 array_list_t* create_array_list(int initial_size) {

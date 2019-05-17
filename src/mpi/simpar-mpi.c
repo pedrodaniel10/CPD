@@ -9,13 +9,15 @@
 
 enum { TAG_INIT_PARTICLES, TAG_SEND_CENTER_OF_MASS, TAG_SEND_PARTICLES };
 
+node_t* adjacent_processes[8] = {0};
+
 array_list_t* particles;
 cell_t** cells;
 
 int myRank, number_processors;
 int size_processor_grid[2] = {0, 0};
 int my_coordinates[2];
-node_t* adjacent_processes[8] = {0};
+node_t* processes_buffers;
 
 int size_local_cell_matrix[2];
 MPI_Comm cart_comm;
@@ -70,14 +72,16 @@ void create_cartesian_communicator(int grid_size) {
 		}
 		adjacent_processes[i] = (node_t*)calloc(1, sizeof(node_t));
 		adjacent_processes[i]->rank = adjacent_processes_rank[i];
-		// printf("[%d] Adjacent rank = %d\n", myRank, adjacent_processes[i]->rank);
-		// fflush(stdout);
+
 		for (int j = i + 1; j < 8; j++) {
 			if (adjacent_processes_rank[j] == adjacent_processes_rank[i]) {
 				adjacent_processes[j] = adjacent_processes[i];
 			}
 		}
 	}
+
+	// Populate all processes
+	processes_buffers = (node_t*)calloc(number_processors, sizeof(node_t));
 }
 
 void init_cells(int grid_size) {
@@ -219,7 +223,7 @@ void send_recv_centers_of_mass() {
 			adjacent_processes[i]->cells_buffer_send = (cell_t*)calloc(number_cells_max, sizeof(cell_t));
 		}
 		if (adjacent_processes[i]->cells_buffer_recv == NULL) {
-			adjacent_processes[i]->cells_buffer_recv = (cell_t*)malloc(sizeof(cell_t) * number_cells_max);
+			adjacent_processes[i]->cells_buffer_recv = (cell_t*)calloc(number_cells_max, sizeof(cell_t));
 		}
 	}
 
@@ -287,6 +291,7 @@ void send_recv_centers_of_mass() {
 			request[i] = MPI_REQUEST_NULL;
 			continue;
 		}
+
 		MPI_Irecv(adjacent_processes[i]->cells_buffer_recv, SIZEOF_CELL(number_cells_max), MPI_DOUBLE,
 		          adjacent_processes[i]->rank, TAG_SEND_CENTER_OF_MASS, cart_comm, &request[i]);
 		adjacent_processes[i]->received = 1;
@@ -431,103 +436,85 @@ void calculate_new_iteration(int grid_size) {
 		int rank;
 		MPI_Cart_rank(cart_comm, processor_coordinates, &rank);
 
-		// printf("[%d] Particle #%d: velocity = (%f,%f), position = (%f,%f)\n", myRank, i, particle->velocity.x,
-		//        particle->velocity.y, particle->position.x, particle->position.y);
-
 		// Remove and insert
 		if (rank != myRank) {
-			int flag = 0;
-			for (int j = 0; j < 8; j++) {
-				if (adjacent_processes[j]->particles_buffer_send == NULL) {
-					adjacent_processes[j]->particles_buffer_send = create_array_list(1024);
-				}
-				if (adjacent_processes[j]->rank == rank) {
-					append(adjacent_processes[j]->particles_buffer_send, *particle);
-					list_remove(particles, i);
-					i--;
-					flag = 1;
-					break;
-				}
+			// int flag = 0;
+			if (processes_buffers[rank].particles_buffer_send == NULL) {
+				processes_buffers[rank].particles_buffer_send = create_array_list(1024);
 			}
+			append(processes_buffers[rank].particles_buffer_send, *particle);
+			list_remove(particles, i);
+			i--;
 
-			if (!flag) {
-				printf("[%d] Particle jumped more than 1 cell.\n", myRank);
-				fflush(stdout);
-			}
+			// if (!flag) {
+			// 	printf("[%d] Particle jumped more than 1 cell.\n", myRank);
+			// 	fflush(stdout);
+			// }
 		}
 	}
-	// for (int i = 0; i < particles->length; i++) {
-	// 	particle_t* particle = list_get(particles, i);
-
-	// 	printf("[%d] Particle #%.0f: velocity = (%f,%f), position = (%f,%f)\n", myRank, particle->index,
-	// 	particle->velocity.x,
-	// 	       particle->velocity.y, particle->position.x, particle->position.y);
-	// 	fflush(stdout);
-	// }
 }
 
 void send_recv_particles() {
 	// Send particles
 	MPI_Request request[8];
-	for (int i = 0; i < 8; i++) {
-		if (adjacent_processes[i]->sent == 1) {
+	for (int i = 0; i < number_processors; i++) {
+		if (i == myRank) {
+			continue;
+		}
+		if (processes_buffers[i].sent == 1) {
 			request[i] = MPI_REQUEST_NULL;
 			continue;
 		}
 
-		if (adjacent_processes[i]->particles_buffer_send == NULL) {
-			adjacent_processes[i]->particles_buffer_send = create_array_list(1024);
+		if (processes_buffers[i].particles_buffer_send == NULL) {
+			processes_buffers[i].particles_buffer_send = create_array_list(1024);
 		}
 
-		if (adjacent_processes[i]->particles_buffer_send->length == 0) {
-			MPI_Isend(adjacent_processes[i]->particles_buffer_send->particles, 1, MPI_DOUBLE,
-			          adjacent_processes[i]->rank, TAG_SEND_PARTICLES, cart_comm, &request[i]);
+		if (processes_buffers[i].particles_buffer_send->length == 0) {
+			MPI_Isend(processes_buffers[i].particles_buffer_send->particles, 1, MPI_DOUBLE, i, TAG_SEND_PARTICLES,
+			          cart_comm, &request[i]);
 
 		} else {
-			MPI_Isend(adjacent_processes[i]->particles_buffer_send->particles,
-			          SIZEOF_PARTICLE(adjacent_processes[i]->particles_buffer_send->length), MPI_DOUBLE,
-			          adjacent_processes[i]->rank, TAG_SEND_PARTICLES, cart_comm, &request[i]);
+			MPI_Isend(processes_buffers[i].particles_buffer_send->particles,
+			          SIZEOF_PARTICLE(processes_buffers[i].particles_buffer_send->length), MPI_DOUBLE, i,
+			          TAG_SEND_PARTICLES, cart_comm, &request[i]);
 		}
-		adjacent_processes[i]->sent = 1;
+		processes_buffers[i].sent = 1;
 	}
 
 	// Receive particles
-	for (int i = 0; i < 8; i++) {
-		if (adjacent_processes[i]->received == 1) {
+	for (int i = 0; i < number_processors; i++) {
+		if (i == myRank || processes_buffers[i].received == 1) {
 			continue;
 		}
 
 		MPI_Status status;
 		int number_elements_received;
-		MPI_Probe(adjacent_processes[i]->rank, TAG_SEND_PARTICLES, cart_comm, &status);
+		MPI_Probe(i, TAG_SEND_PARTICLES, cart_comm, &status);
 		MPI_Get_count(&status, MPI_DOUBLE, &number_elements_received);
 
 		if (number_elements_received == 1) {
-			MPI_Recv(&adjacent_processes[i]->particles_buffer_recv, 1, MPI_DOUBLE, adjacent_processes[i]->rank,
-			         TAG_SEND_PARTICLES, cart_comm, &status);
-			adjacent_processes[i]->received = 1;
+			double buffer[1];
+			MPI_Recv(buffer, 1, MPI_DOUBLE, i, TAG_SEND_PARTICLES, cart_comm, &status);
+			processes_buffers[i].received = 1;
 			continue;
 		}
 
 		MPI_Recv((void*)allocate_array(particles, GET_NUMBER_PARTICLE(number_elements_received)),
-		         number_elements_received, MPI_DOUBLE, adjacent_processes[i]->rank, TAG_SEND_PARTICLES, cart_comm,
-		         &status);
+		         number_elements_received, MPI_DOUBLE, i, TAG_SEND_PARTICLES, cart_comm, &status);
 		MPI_Get_count(&status, MPI_DOUBLE, &number_elements_received);
 
-		adjacent_processes[i]->received = 1;
+		processes_buffers[i].received = 1;
 	}
 
-	// printf("[%d] #Particles = %d\n", myRank, particles->length);
-	// fflush(stdout);
-
 	// Free
-	for (int i = 0; i < 8; i++) {
-		if (adjacent_processes[i]->particles_buffer_send != NULL) {
-			list_free(adjacent_processes[i]->particles_buffer_send);
-			adjacent_processes[i]->particles_buffer_send = NULL;
+	for (int i = 0; i < number_processors; i++) {
+		if (processes_buffers[i].particles_buffer_send != NULL) {
+			list_free(processes_buffers[i].particles_buffer_send);
+			processes_buffers[i].particles_buffer_send = NULL;
 		}
-		adjacent_processes[i]->received = 0;
-		adjacent_processes[i]->sent = 0;
+		processes_buffers[i].received = 0;
+		processes_buffers[i].sent = 0;
 	}
 }
 
@@ -545,6 +532,18 @@ void calculate_overall_center_of_mass() {
 		total_mass += particle->mass;
 		center_of_mass.x += particle->mass * particle->position.x;
 		center_of_mass.y += particle->mass * particle->position.y;
+	}
+	double global_total_mass;
+	double global_center_of_mass_x;
+	double global_center_of_mass_y;
+	MPI_Reduce(&total_mass, &global_total_mass, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
+	MPI_Reduce(&center_of_mass.x, &global_center_of_mass_x, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
+	MPI_Reduce(&center_of_mass.y, &global_center_of_mass_y, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
+
+	if (myRank == 0) {
+		center_of_mass.x = global_center_of_mass_x / global_total_mass;
+		center_of_mass.y = global_center_of_mass_y / global_total_mass;
+		printf("%.2f %.2f\n", center_of_mass.x, center_of_mass.y);
 	}
 }
 
@@ -572,14 +571,6 @@ int main(int argc, char* argv[]) {
 		receiveParticles();
 	}
 
-	// for (int i = 0; i < particles->length; i++) {
-	// 	particle_t* particle = list_get(particles, i);
-
-	// 	printf("[%d] Iteration = %d / Particle #%.0f: velocity = (%f,%f), position = (%f,%f)\n", myRank, -1,
-	// 	       particle->index, particle->velocity.x, particle->velocity.y, particle->position.x,
-	// particle->position.y); 	fflush(stdout);
-	// }
-
 	for (int n = 0; n < n_time_steps; n++) {
 		calculate_centers_of_mass(grid_size);
 		send_recv_centers_of_mass();
@@ -588,13 +579,6 @@ int main(int argc, char* argv[]) {
 
 		memset(cells[0], 0, sizeof(cell_t) * size_local_cell_matrix[0] * size_local_cell_matrix[1]);
 	}
-	// for (int i = 0; i < particles->length; i++) {
-	// 	particle_t* particle = list_get(particles, i);
-
-	// 	printf("[%d] Particle #%.0f: velocity = (%f,%f), position = (%f,%f)\n", myRank, particle->index,
-	// 	       particle->velocity.x, particle->velocity.y, particle->position.x, particle->position.y);
-	// 	fflush(stdout);
-	// }
 
 	calculate_overall_center_of_mass();
 

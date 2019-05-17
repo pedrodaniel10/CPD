@@ -58,7 +58,7 @@ ifeq ($(program), omp)
 	$(OMP_DIR)/$(TARGET_OMP) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
 endif
 ifeq ($(program), mpi)
-	$(MPI_DIR)/$(TARGET_MPI) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
+	mpirun -np 4 $(MPI_DIR)/$(TARGET_MPI) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
 endif
 
 	@if diff -s $(TEST_DIR)/output/$(test).out $(TEST_DIR)/output/$(test).myout; \
