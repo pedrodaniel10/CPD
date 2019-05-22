@@ -81,7 +81,8 @@ void create_cartesian_communicator(int grid_size) {
 	}
 
 	// Populate all processes
-	processes_buffers = (node_t*)calloc(number_processors, sizeof(node_t));
+	processes_buffers = (node_t*)calloc(size_processor_grid[0] * size_processor_grid[1], sizeof(node_t));
+	number_processors = size_processor_grid[0] * size_processor_grid[1];
 }
 
 void init_cells(int grid_size) {
@@ -185,6 +186,7 @@ void receiveParticles() {
 }
 
 void calculate_centers_of_mass(int grid_size) {
+#pragma omp parallel for
 	for (int i = 0; i < particles->length; i++) {
 		particle_t* particle = list_get(particles, i);
 		int global_cell_index_x = particle->position.x * grid_size;
@@ -196,9 +198,13 @@ void calculate_centers_of_mass(int grid_size) {
 
 		cell_t* cell = &cells[local_cell_index_x][local_cell_index_y];
 
+#pragma omp atomic
 		cell->mass_sum += particle->mass;
 
+#pragma omp atomic
 		cell->center_of_mass.x += particle->mass * particle->position.x;
+
+#pragma omp atomic
 		cell->center_of_mass.y += particle->mass * particle->position.y;
 	}
 
@@ -445,18 +451,13 @@ void calculate_new_iteration(int grid_size) {
 			append(processes_buffers[rank].particles_buffer_send, *particle);
 			list_remove(particles, i);
 			i--;
-
-			// if (!flag) {
-			// 	printf("[%d] Particle jumped more than 1 cell.\n", myRank);
-			// 	fflush(stdout);
-			// }
 		}
 	}
 }
 
 void send_recv_particles() {
 	// Send particles
-	MPI_Request request[8];
+	MPI_Request* request = malloc(sizeof(MPI_Request) * number_processors);
 	for (int i = 0; i < number_processors; i++) {
 		if (i == myRank) {
 			continue;
@@ -481,7 +482,7 @@ void send_recv_particles() {
 		}
 		processes_buffers[i].sent = 1;
 	}
-
+	free(request);
 	// Receive particles
 	for (int i = 0; i < number_processors; i++) {
 		if (i == myRank || processes_buffers[i].received == 1) {
@@ -519,8 +520,10 @@ void send_recv_particles() {
 }
 
 void calculate_overall_center_of_mass() {
-	coordinate_t center_of_mass = {0};
+	double center_of_mass_x = 0, center_of_mass_y = 0;
 	double total_mass = 0;
+
+#pragma omp parallel for reduction(+ : total_mass, center_of_mass_x, center_of_mass_y)
 	for (int i = 0; i < particles->length; i++) {
 		particle_t* particle = list_get(particles, i);
 
@@ -530,20 +533,20 @@ void calculate_overall_center_of_mass() {
 		}
 
 		total_mass += particle->mass;
-		center_of_mass.x += particle->mass * particle->position.x;
-		center_of_mass.y += particle->mass * particle->position.y;
+		center_of_mass_x += particle->mass * particle->position.x;
+		center_of_mass_y += particle->mass * particle->position.y;
 	}
 	double global_total_mass;
 	double global_center_of_mass_x;
 	double global_center_of_mass_y;
 	MPI_Reduce(&total_mass, &global_total_mass, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
-	MPI_Reduce(&center_of_mass.x, &global_center_of_mass_x, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
-	MPI_Reduce(&center_of_mass.y, &global_center_of_mass_y, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
+	MPI_Reduce(&center_of_mass_x, &global_center_of_mass_x, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
+	MPI_Reduce(&center_of_mass_y, &global_center_of_mass_y, 1, MPI_DOUBLE, MPI_SUM, 0, cart_comm);
 
 	if (myRank == 0) {
-		center_of_mass.x = global_center_of_mass_x / global_total_mass;
-		center_of_mass.y = global_center_of_mass_y / global_total_mass;
-		printf("%.2f %.2f\n", center_of_mass.x, center_of_mass.y);
+		center_of_mass_x = global_center_of_mass_x / global_total_mass;
+		center_of_mass_y = global_center_of_mass_y / global_total_mass;
+		printf("%.2f %.2f\n", center_of_mass_x, center_of_mass_y);
 	}
 }
 
@@ -585,4 +588,5 @@ int main(int argc, char* argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	MPI_Finalize();
+	return 0;
 }
