@@ -1,4 +1,4 @@
-#include "../include/common.h"
+#include "../include/particles.h"
 
 cell_t **init_cells(int grid_size) {
 	// Allocate Cells

@@ -8,6 +8,7 @@ TARGET_OMP = simpar-omp
 TARGET_MPI = simpar-mpi
 
 CC =gcc 
+MPICC =mpicc
 COMPP =kinst-ompp 
 CFLAGS =-c -g3 -Wall -pedantic -Werror
 CFLAGSLINK =-lm
@@ -42,10 +43,10 @@ else
 endif
 
 mpi.o: 
-	$(CC) $(CFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
+	$(MPICC) $(CFLAGS) $(COMPFLAGS) $(MPI_DIR)/$(TARGET_MPI).c -o $(MPI_DIR)/$(TARGET_MPI).o 
 
 mpi: mpi.o
-	$(CC) $(MPI_DIR)/$(TARGET_MPI).o $(CFLAGSLINK) -o $(MPI_DIR)/$(TARGET_MPI)
+	$(MPICC) $(MPI_DIR)/$(TARGET_MPI).o $(CFLAGSLINK) $(COMPFLAGS) -o $(MPI_DIR)/$(TARGET_MPI)
 
 # To run a test have 2 parameters: test is the name of the test and program is the program to use to test
 # The program can be: serial, omp, mpi
@@ -57,7 +58,7 @@ ifeq ($(program), omp)
 	$(OMP_DIR)/$(TARGET_OMP) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
 endif
 ifeq ($(program), mpi)
-	$(MPI_DIR)/$(TARGET_MPI) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
+	mpirun -np 4 $(MPI_DIR)/$(TARGET_MPI) $(shell cat $(TEST_DIR)/$(test)) > $(TEST_DIR)/output/$(test).myout
 endif
 
 	@if diff -s $(TEST_DIR)/output/$(test).out $(TEST_DIR)/output/$(test).myout; \
