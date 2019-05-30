@@ -1,12 +1,20 @@
+#include <omp.h>
 #include "../include/particles.h"
 
-cell_t **init_cells(int grid_size) {
-	// Allocate Cells
-	cell_t **cells_matrix = (cell_t **)malloc(sizeof(cell_t *) * grid_size);
-	cell_t *cells_chunk = (cell_t *)calloc(grid_size * grid_size, sizeof(cell_t));
+cell_t ***cells_threads;
+int num_max_threads;
 
-	for (int i = 0; i < grid_size; i++) {
-		cells_matrix[i] = cells_chunk + (i * grid_size);
+cell_t **init_cells(int grid_size) {
+	cell_t *cells_chunk = (cell_t *)calloc(grid_size * grid_size * num_max_threads, sizeof(cell_t));
+	cell_t **cells_rows = (cell_t **)malloc(sizeof(cell_t *) * grid_size * num_max_threads);
+	cells_threads = (cell_t ***)malloc(sizeof(cell_t **) * num_max_threads);
+
+	for (int i = 0; i < num_max_threads; i++) {
+		cells_threads[i] = &cells_rows[i * grid_size];
+
+		for (int j = 0; j < grid_size; j++) {
+			cells_threads[i][j] = &cells_chunk[(i * grid_size * grid_size) + (j * grid_size)];
+		}
 	}
 
 	// Allocate Adjacent Cells Memory
@@ -26,38 +34,53 @@ cell_t **init_cells(int grid_size) {
 			for (int x = -1; x <= 1; x++) {
 				for (int y = -1; y <= 1; y++) {
 					adjacent_cell[index_adjacent_cells] =
-					    &cells_matrix[(i + x + grid_size) % grid_size][(j + y + grid_size) % grid_size];
+					    &cells_threads[0][(i + x + grid_size) % grid_size][(j + y + grid_size) % grid_size];
 					index_adjacent_cells++;
 				}
 			}
 		}
 	}
-	return cells_matrix;
+	return cells_threads[0];
 }
 
 void calculate_centers_of_mass(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
-	for (int i = 0; i < number_particles; i++) {
-		particle_t *particle = &particles[i];
-		cell_t *cell = &cells[particle->cell.x][particle->cell.y];
+#pragma omp parallel
+	{
+		int num_threads = omp_get_num_threads();
+		int thread_num = omp_get_thread_num();
 
-		cell->mass_sum += particle->mass;
+#pragma omp for
+		for (int i = 0; i < number_particles; i++) {
+			particle_t *particle = &particles[i];
+			cell_t *cell = &cells_threads[thread_num][particle->cell.x][particle->cell.y];
 
-		cell->center_of_mass.x += particle->mass * particle->position.x;
-		cell->center_of_mass.y += particle->mass * particle->position.y;
-	}
+			cell->mass_sum += particle->mass;
 
-	for (int i = 0; i < grid_size; i++) {
-		for (int j = 0; j < grid_size; j++) {
-			cell_t *cell = &cells[i][j];
-			if (cell->mass_sum != 0) {
-				cell->center_of_mass.x /= cell->mass_sum;
-				cell->center_of_mass.y /= cell->mass_sum;
+			cell->center_of_mass.x += particle->mass * particle->position.x;
+			cell->center_of_mass.y += particle->mass * particle->position.y;
+		}
+
+#pragma omp for
+		for (int i = 0; i < grid_size; i++) {
+			for (int j = 0; j < grid_size; j++) {
+				cell_t *cell = &cells[i][j];
+				for (int k = 1; k < num_threads; k++) {
+					cell_t *thread_cell = &cells_threads[k][i][j];
+					cell->mass_sum += thread_cell->mass_sum;
+					cell->center_of_mass.x += thread_cell->center_of_mass.x;
+					cell->center_of_mass.y += thread_cell->center_of_mass.y;
+				}
+				if (cell->mass_sum != 0) {
+					cell->center_of_mass.x /= cell->mass_sum;
+					cell->center_of_mass.y /= cell->mass_sum;
+				}
 			}
 		}
 	}
 }
 
 void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_size, int number_particles) {
+#pragma omp parallel for
 	for (int i = 0; i < number_particles; i++) {
 		particle_t *particle = &particles[i];
 		coordinate_t force = {0}, acceleration = {0};
@@ -105,19 +128,20 @@ void calculate_new_iteration(particle_t *particles, cell_t **cells, int grid_siz
 }
 
 coordinate_t calculate_overall_center_of_mass(particle_t *particles, int number_particles) {
-	coordinate_t center_of_mass = {0};
+	double center_of_mass_x = 0, center_of_mass_y = 0;
 	double total_mass = 0;
+#pragma omp parallel for reduction(+ : total_mass, center_of_mass_x, center_of_mass_y)
 	for (int i = 0; i < number_particles; i++) {
 		particle_t *particle = &particles[i];
 
 		total_mass += particle->mass;
-		center_of_mass.x += particle->mass * particle->position.x;
-		center_of_mass.y += particle->mass * particle->position.y;
+		center_of_mass_x += particle->mass * particle->position.x;
+		center_of_mass_y += particle->mass * particle->position.y;
 	}
-	center_of_mass.x /= total_mass;
-	center_of_mass.y /= total_mass;
+	center_of_mass_x /= total_mass;
+	center_of_mass_y /= total_mass;
 
-	return center_of_mass;
+	return (coordinate_t){center_of_mass_x, center_of_mass_y};
 }
 
 int main(int argc, const char **argv) {
@@ -129,16 +153,18 @@ int main(int argc, const char **argv) {
 	int grid_size = atoi(argv[2]);
 	int number_particles = atoi(argv[3]);
 	int n_time_steps = atoi(argv[4]);
-
+	num_max_threads = omp_get_max_threads();
+	particle_t *particles;
+	cell_t **cells;
 	// Initialize
-	particle_t *particles = init_particles(atoi(argv[1]), grid_size, number_particles);
-	cell_t **cells = init_cells(grid_size);
+	particles = init_particles(atoi(argv[1]), grid_size, number_particles);
+	cells = init_cells(grid_size);
 
 	for (int n = 0; n < n_time_steps; n++) {
 		calculate_centers_of_mass(particles, cells, grid_size, number_particles);
 		calculate_new_iteration(particles, cells, grid_size, number_particles);
 
-		memset(cells[0], 0, sizeof(cell_t) * grid_size * grid_size);
+		memset(cells[0], 0, sizeof(cell_t) * grid_size * grid_size * num_max_threads);
 	}
 
 	coordinate_t center_of_mass = calculate_overall_center_of_mass(particles, number_particles);
@@ -147,10 +173,12 @@ int main(int argc, const char **argv) {
 
 	// Free resources
 	free(particles);
-	free(cells[0]);
-	free(cells);
+	free(cells_threads[0][0]);
+	free(cells_threads[0]);
+	free(cells_threads);
 	free(adjacent_cells[0][0]);
 	free(adjacent_cells[0]);
 	free(adjacent_cells);
+
 	return 0;
 }
