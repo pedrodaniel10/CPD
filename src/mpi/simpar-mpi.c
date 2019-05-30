@@ -221,7 +221,7 @@ void calculate_centers_of_mass(int grid_size) {
 
 void send_recv_centers_of_mass() {
 	int cells_size_x = size_local_cell_matrix[0] - 2;
-	int cells_size_y = size_local_cell_matrix[0] - 2;
+	int cells_size_y = size_local_cell_matrix[1] - 2;
 	int number_cells_max = cells_size_x * 2 + cells_size_y * 2 + 4;
 	// Prepare send buffers
 	for (int i = 0; i < 8; i++) {
